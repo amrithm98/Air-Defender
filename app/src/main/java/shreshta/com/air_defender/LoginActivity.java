@@ -26,6 +26,7 @@ import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.firebase.iid.FirebaseInstanceId;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -46,6 +47,7 @@ public class LoginActivity extends AppCompatActivity implements GoogleApiClient.
     private FirebaseAuth mAuth;
     private FirebaseAuth.AuthStateListener mAuthListener;
     private static final String TAG = "GoogleActivity";
+    public String fcmToken;
     @BindView(R.id.gplus)
     Button gPlus;
     @Override
@@ -79,7 +81,7 @@ public class LoginActivity extends AppCompatActivity implements GoogleApiClient.
                     Toast.makeText(LoginActivity.this,"Network Unavailable",Toast.LENGTH_LONG).show();
                     return;
                 }
-                autoLogin=false;
+                autoLogin=true;
                 Intent signInIntent = Auth.GoogleSignInApi.getSignInIntent(mGoogleApiClient);
                 startActivityForResult(signInIntent, RC_SIGN_IN);
             }
@@ -102,12 +104,14 @@ public class LoginActivity extends AppCompatActivity implements GoogleApiClient.
                     // User is signed in
                     Global.uid=user.getUid();
                     Global.user=user.getDisplayName();
+                    fcmToken= FirebaseInstanceId.getInstance().getToken();
+                    Log.d("fcm",fcmToken);
                     Log.d("User",Global.user);
                     final RestApiInterface service = RestApiClient.getService();
                     AuthUtil.getFirebaseToken(new AuthUtil.Listener() {
                         @Override
                         public void tokenObtained(String token) {
-                            startActivity(new Intent(LoginActivity.this, MainActivity.class));
+                            startActivity(new Intent(LoginActivity.this, MapsActivity.class));
                             Log.d("token",token);
                             Call<User> call=service.login(token);
                             call.enqueue(new Callback<User>() {
@@ -116,6 +120,7 @@ public class LoginActivity extends AppCompatActivity implements GoogleApiClient.
                                     if(response.code()==200) {
                                         User user = response.body();
                                         Global.id=user.uid;
+                                        updateFcm(fcmToken);
                                         Toast.makeText(getApplicationContext(),user.name,Toast.LENGTH_SHORT).show();
 //                                        SharedPreferences sharedPreferences = getSharedPreferences("drishti", Context.MODE_PRIVATE);
 //                                        SharedPreferences.Editor editor = sharedPreferences.edit();
@@ -123,14 +128,14 @@ public class LoginActivity extends AppCompatActivity implements GoogleApiClient.
 //                                        editor.commit();
                                         Log.d("RegStat",String.valueOf(user.registered));
                                         if (user.registered) {
-                                            startActivity(new Intent(LoginActivity.this, MainActivity.class));
+                                            startActivity(new Intent(LoginActivity.this, MapsActivity.class));
                                             finish();
                                         } else {
                                             if (autoLogin) {
                                                 FirebaseAuth.getInstance().signOut();
                                                 autoLogin = false;
                                             } else {
-                                                startActivity(new Intent(LoginActivity.this, MainActivity.class));
+                                                startActivity(new Intent(LoginActivity.this, MapsActivity.class));
                                                 finish();
                                             }
                                         }
@@ -163,7 +168,36 @@ public class LoginActivity extends AppCompatActivity implements GoogleApiClient.
         mAuth.addAuthStateListener(mAuthListener);
 
     }
-
+    public void updateFcm(final String fcmtoken)
+    {
+        if(NetworkUtil.isNetworkAvailable(getApplicationContext())) {
+            AuthUtil.getFirebaseToken(new AuthUtil.Listener() {
+                @Override
+                public void tokenObtained(String token) {
+                    RestApiInterface service = RestApiClient.getService();
+                    Log.d("upload","Doing");
+                    Call<User> call = service.fcmUpdate(token,fcmtoken);
+                    call.enqueue(new Callback<User>() {
+                        @Override
+                        public void onResponse(Call<User> call, Response<User> response) {
+                            if(response.code()==200) {
+                                Toast.makeText(getApplicationContext(),"FCM Updated",Toast.LENGTH_SHORT).show();
+                                finish();
+                            }else{
+                                Toast.makeText(getApplicationContext(),"Network Error",Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                        @Override
+                        public void onFailure(Call<User> call, Throwable t) {
+                            Log.d("Error",t.toString());
+                        }
+                    });
+                }
+            });
+        }else {
+            Toast.makeText(getApplicationContext(),"Network Error",Toast.LENGTH_SHORT).show();
+        }
+    }
     @Override
     protected void onStop() {
         super.onStop();

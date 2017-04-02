@@ -3,6 +3,7 @@ package shreshta.com.air_defender.Utils;
 import retrofit2.Call;
 import retrofit2.http.Field;
 import retrofit2.http.FormUrlEncoded;
+import retrofit2.http.Header;
 import retrofit2.http.POST;
 import shreshta.com.air_defender.Models.User;
 
@@ -12,6 +13,10 @@ import shreshta.com.air_defender.Models.User;
 
 public interface RestApiInterface {
     @FormUrlEncoded
-    @POST("user/auth/login")
+    @POST("admin/auth/login")
     Call<User> login(@Field("idToken") String idToken);
+
+    @FormUrlEncoded
+    @POST("admin/auth/register")
+    Call <User> fcmUpdate(@Header("x-auth-token")String idToken, @Field("fcmId")String fcm);
 }
